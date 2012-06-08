@@ -42,12 +42,12 @@ def list_torrents(trans, _args):
         fields = torr.fields
         print num, fields['name'][:30], status(torr), torr.progress, torr.eta
 
-def start_daemon(trans, args):
-    """Start transmission daemon."""
+def start_torrent(trans, args):
+    """Start torrent. Parameters is a list of torrents numbers."""
     trans.start(args)
 
-def stop_daemon(trans, args):
-    """Stop transmission daemon."""
+def stop_torrent(trans, args):
+    """Stop torrent. Parameters is a list of torrents numbers."""
     trans.stop(args)
 
 def up_speed(trans, args=None):
@@ -132,8 +132,8 @@ def main(argv):
     trans = Transmission(user=tr_login, password=tr_passwd, timeout=10)
 
     proc = OrderedDict([
-            ('start', start_daemon),
-            ('stop' , stop_daemon),
+            ('start', start_torrent),
+            ('stop' , stop_torrent),
             ('ls'   , list_torrents),
             ('add'  , add_torrent),
             ('rm'   , rm_torrent),
