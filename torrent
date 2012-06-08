@@ -1,0 +1,155 @@
+#!/usr/bin/python -tt
+# -*- coding: utf-8 -*-
+# vim: sw=4 ts=4 expandtab ai
+
+"""
+Tiny part of transmission-remote functionality and some 
+hopefully handy extensions. At least they're handy for me
+
+Author: Ed Bartosh <bartosh@gmail.com>
+Licence: WTFPL http://sam.zoy.org/wtfpl/
+Version: 0.0.1
+"""
+
+import sys
+import urllib
+import urllib2
+import cookielib
+import base64
+from netrc import netrc
+from collections import OrderedDict
+
+from transmissionrpc import Client as Transmission
+from transmissionrpc.error import TransmissionError
+
+def status(torrent):
+    """Workaround for Debian testing version of transmission-rpc
+       and transmission-daemon.
+    """
+    return {
+        0: 'stopped',
+        1: 'check pending',
+        2: 'checking',
+        3: 'download pending',
+        4: 'downloading',
+        5: 'seed pending',
+        6: 'seeding',
+    }[torrent.fields['status']]
+
+def list_torrents(trans, _args):
+    """List torrents."""
+    for num, torr in trans.list().iteritems():
+        fields = torr.fields
+        print num, fields['name'][:30], status(torr), torr.progress, torr.eta
+
+def start_daemon(trans, args):
+    """Start transmission daemon."""
+    trans.start(args)
+
+def stop_daemon(trans, args):
+    """Stop transmission daemon."""
+    trans.stop(args)
+
+def up_speed(trans, args=None):
+    """Set upload speed limit. If no parameters provided
+       it turns off limiting of upload speed.
+    """
+    if args:
+        trans.set_session(speed_limit_up=args[0])
+        trans.set_session(speed_limit_up_enabled=True)
+    else:
+        trans.set_session(speed_limit_up_enabled=False)
+
+def down_speed(trans, args=None):
+    """Set download speed limit. If no parameters provided
+       it turns off limiting of download speed.
+    """
+    if args:
+        trans.set_session(speed_limit_down=args[0])
+        trans.set_session(speed_limit_down_enabled=True)
+    else:
+        trans.set_session(speed_limit_down_enabled=False)
+
+def rm_torrent(trans, args):
+    """Remove torrent."""
+    trans.remove(args, delete_data=True)
+
+def fetch_torrent(url, netrcobj):
+    """Fetch torrent from rutracker.org.
+       Return file-like urllib object.
+    """
+
+    rt_host = 'rutracker.org'
+    rt_login, _, rt_passwd = netrcobj.authenticators(rt_host)
+
+    torrent_id = url.split('=')[-1]
+    login_link = 'http://login.%s/forum/login.php' % rt_host
+    torrent_link = 'http://dl.%s/forum/dl.php?t=' % rt_host
+    thread_link = 'http://%s/forum/viewtopic.php?t=' % rt_host
+
+    params = urllib.urlencode({
+        'login_username' : rt_login,
+        'login_password' : rt_passwd,
+        'login' : '%C2%F5%EE%E4'
+    })
+
+    post_argument = str.encode(params)
+    cookie = cookielib.CookieJar()
+    opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookie))
+    opener.addheaders = [('User-agent', 'Opera/9.80 Version/11.62')]
+    urllib2.install_opener(opener)
+    opener.open(login_link, post_argument)
+    torrent = opener.open(torrent_link + torrent_id, post_argument)
+    torrent.addheaders = [('Referer', thread_link + torrent_id)]
+    return torrent
+
+def add_torrent(trans, args):
+    """Add torrent from rutracker.org tracker.
+       commandline argument is an torrent url.
+    """
+    url, netrcobj, tr_login, tr_passwd = args[:4]
+    torrent = fetch_torrent(url, netrcobj)
+
+    trans = Transmission(user=tr_login, password=tr_passwd)
+    try:
+        trans.add(base64.b64encode(torrent.read()))
+    except TransmissionError, excobj:
+        print 'Transmission error: %s' % str(excobj)
+        return 1
+
+def usage(proc):
+    """Script usage instructions."""
+    print __doc__
+    print "\nUsage: torrent <command> [params]\n"
+    for cmd, handler in proc.iteritems():
+        print "%6s - %s" % (cmd, handler.__doc__)
+
+def main(argv):
+    """Script entry point."""
+
+    nrc = netrc()
+    tr_login, _, tr_passwd = nrc.authenticators('localhost')
+    trans = Transmission(user=tr_login, password=tr_passwd, timeout=10)
+
+    proc = OrderedDict([
+            ('start', start_daemon),
+            ('stop' , stop_daemon),
+            ('ls'   , list_torrents),
+            ('add'  , add_torrent),
+            ('rm'   , rm_torrent),
+            ('up'   , up_speed),
+            ('down' , down_speed),
+           ])
+
+    if not argv or argv[0] not in proc:
+        usage(proc)
+        return 1
+
+    if argv[0] == 'add':
+        argv.extend([nrc, tr_login, tr_passwd])
+
+    return proc[argv[0]](trans, argv[1:])
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))
+
