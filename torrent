@@ -105,7 +105,7 @@ def fetch_torrent(url, netrcobj):
 
 def add_torrent(trans, args):
     """Add torrent from rutracker.org tracker.
-       commandline argument is an torrent url.
+       commandline argument is a torrent url.
     """
     url, netrcobj, tr_login, tr_passwd = args[:4]
     torrent = fetch_torrent(url, netrcobj)
@@ -127,28 +127,28 @@ def usage(proc):
 def main(argv):
     """Script entry point."""
 
+    proc = OrderedDict([
+            ('start', (start_torrent, 2)),
+            ('stop' , (stop_torrent, 2)),
+            ('ls'   , (list_torrents, 1)),
+            ('add'  , (add_torrent, 2)),
+            ('rm'   , (rm_torrent, 2)),
+            ('up'   , (up_speed, 1)),
+            ('down' , (down_speed, 1)),
+           ])
+
+    if not argv or argv[0] not in proc or len(argv) < proc[argv[0]][1]:
+        usage(proc)
+        return 1
+
     nrc = netrc()
     tr_login, _, tr_passwd = nrc.authenticators('localhost')
     trans = Transmission(user=tr_login, password=tr_passwd, timeout=10)
 
-    proc = OrderedDict([
-            ('start', start_torrent),
-            ('stop' , stop_torrent),
-            ('ls'   , list_torrents),
-            ('add'  , add_torrent),
-            ('rm'   , rm_torrent),
-            ('up'   , up_speed),
-            ('down' , down_speed),
-           ])
-
-    if not argv or argv[0] not in proc:
-        usage(proc)
-        return 1
-
     if argv[0] == 'add':
         argv.extend([nrc, tr_login, tr_passwd])
 
-    return proc[argv[0]](trans, argv[1:])
+    return proc[argv[0]][0](trans, argv[1:])
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))
