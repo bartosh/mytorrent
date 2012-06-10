@@ -4,7 +4,7 @@
 import imp
 from StringIO import StringIO
 from unittest import TestCase
-import mock
+from mock import Mock
 
 import transmissionrpc
 
@@ -28,10 +28,6 @@ class FakeTransmission(object):
 
     start = stop = remove = set_session = empty
 
-class FakeNetrc(object):
-    def authenticators(self, _host):
-        return 'user', '', 'password'
-
 class FakeUrllib(object):
     def __init__(self):
         self.num = 1
@@ -53,7 +49,8 @@ class Test(TestCase):
         self.mod = imp.load_module('torrent', open('torrent'),
                               'torrent', ('', 'r', imp.PY_SOURCE))
         self.mod.Transmission = FakeTransmission
-        self.mod.netrc = FakeNetrc
+        self.mod.netrc = Mock()
+        self.mod.netrc.return_value.authenticators.return_value = ['user', '?', 'password']
         self.mod.sys.stdout = StringIO()
         self.mod.urllib = self.mod.urllib2 = FakeUrllib()
 
