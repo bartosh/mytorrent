@@ -141,8 +141,18 @@ def main(argv):
         usage(proc)
         return 1
 
-    nrc = netrc()
-    tr_login, _, tr_passwd = nrc.authenticators('localhost')
+    try:
+        nrc = netrc()
+    except IOError:
+        print 'Error: ~/.netrc not found'
+        return 1
+
+    auth = nrc.authenticators('localhost')
+    if not auth:
+        print 'Error: localhost is not found in ~/.netrc'
+        return 1
+
+    tr_login, _, tr_passwd = auth
     trans = Transmission(user=tr_login, password=tr_passwd, timeout=10)
 
     if argv[0] == 'add':

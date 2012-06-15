@@ -84,3 +84,8 @@ class Test(TestCase):
             self.main(['add'])
             assert stdout.getvalue().startswith(self.mod.__doc__)
 
+    def test_netrcerrors(self):
+        self.mod.netrc.return_value.authenticators.return_value = None
+        assert self.main(['ls']) == 1
+        self.mod.netrc.side_effect = IOError()
+        assert self.main(['ls']) == 1
