@@ -4,62 +4,51 @@
 import imp
 from StringIO import StringIO
 from unittest import TestCase
-from mock import Mock
-
-import transmissionrpc
-
-class FakeTransmission(object):
-
-    def __init__(self, user, password, timeout=10):
-        self.torrent = transmissionrpc.Torrent(self,
-                {'id': 1, 'name': 'My torrent', 'status': 0,
-                 'sizeWhenDone': 100, 'leftUntilDone': 50,
-                 'eta': 20})
-
-    def list(self):
-        return {1: self.torrent}
-
-    def add(self, arg):
-        if arg == 'MQ==':
-            raise transmissionrpc.error.TransmissionError('Error')
-
-    def empty(self, *args, **kwargs):
-        pass
-
-    start = stop = remove = set_session = empty
-
-class FakeUrllib(object):
-    def __init__(self):
-        self.num = 1
-
-    def urlencode(self, *args):
-        return '123'
-
-    def read(self, *args):
-        self.num ^= 1
-        return ['1', '2'][self.num]
-
-    def empty(self, *args):
-        return self
-
-    build_opener = install_opener = HTTPCookieProcessor = open = empty
+from mock import Mock, MagicMock, patch
+from transmissionrpc.error import TransmissionError
 
 class Test(TestCase):
     def setUp(self):
         self.mod = imp.load_module('torrent', open('torrent'),
                               'torrent', ('', 'r', imp.PY_SOURCE))
-        self.mod.Transmission = FakeTransmission
+
+        items = {}
+        for i in range(7):
+            item = MagicMock()
+            item.fields = {'name': 'Torrent %i' % i, 'status': i}
+            item.eta = 20 * i
+            item.progress = 5 * i
+            items[i] = item
+ 
+        self.mod.Transmission = Mock()
+        self.mod.Transmission.return_value.list.return_value = items
+
         self.mod.netrc = Mock()
-        self.mod.netrc.return_value.authenticators.return_value = ['user', '?', 'password']
-        self.mod.sys.stdout = StringIO()
-        self.mod.urllib = self.mod.urllib2 = FakeUrllib()
+        self.mod.netrc.return_value.authenticators.\
+                return_value = ['user', '?', 'password']
+
+        urllib = Mock()
+        urllib.urlencode.return_value=''
+        self.mod.urllib = urllib
+        urllib2 = Mock()
+        torrent = Mock()
+        torrent.read.return_value = ''
+        urllib2.build_opener.return_value.open.return_value=torrent
+        self.mod.urllib2 = urllib2
 
         self.main = self.mod.main
 
     def test_ls(self):
-        self.main(['ls'])
-        self.mod.sys.stdout.seek(0)
-        assert self.mod.sys.stdout.read() == "1 My torrent stopped 50.0 0:00:20\n"
+        with patch('sys.stdout', new_callable=StringIO) as stdout:
+            self.main(['ls'])
+            assert stdout.getvalue() == """0 Torrent 0 stopped 0 0
+1 Torrent 1 check pending 5 20
+2 Torrent 2 checking 10 40
+3 Torrent 3 download pending 15 60
+4 Torrent 4 downloading 20 80
+5 Torrent 5 seed pending 25 100
+6 Torrent 6 seeding 30 120
+"""
 
     def test_start(self):
         self.main(['start', '1'])
@@ -79,15 +68,19 @@ class Test(TestCase):
         self.main(['rm', '1'])
     
     def test_add(self):
-        assert self.main(['add', 'url']) == 1
         assert self.main(['add', 'url']) == None
 
+    def test_transmissionerror(self):
+        self.mod.Transmission.return_value.add.side_effect = TransmissionError("message")
+        with patch('sys.stdout', new_callable=StringIO) as stdout:
+            self.main(['add', 'url'])
+            assert stdout.getvalue() == 'Transmission error: message\n'
+
     def test_usage(self):
-        self.main([])
-        self.mod.sys.stdout.seek(0)
-        assert self.mod.sys.stdout.read().startswith(self.mod.__doc__)
-        self.mod.sys.stdout.seek(0)
-        self.main(['add'])
-        self.mod.sys.stdout.seek(0)
-        assert self.mod.sys.stdout.read().startswith(self.mod.__doc__)
+        with patch('sys.stdout', new_callable=StringIO) as stdout:
+            self.main([])
+            assert stdout.getvalue().startswith(self.mod.__doc__)
+        with patch('sys.stdout', new_callable=StringIO) as stdout:
+            self.main(['add'])
+            assert stdout.getvalue().startswith(self.mod.__doc__)
 
