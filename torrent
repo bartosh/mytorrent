@@ -36,11 +36,17 @@ def status(torrent):
         6: 'seeding',
     }[torrent.fields['status']]
 
-def list_torrents(trans, _args):
+def list_torrents(trans, args):
     """List torrents."""
     for num, torr in trans.list().iteritems():
         fields = torr.fields
-        print num, fields['name'][:30], status(torr), torr.progress, torr.eta
+        if not args or str(num) in args:
+            print num, fields['name'][:30], status(torr), \
+                torr.progress, torr.eta
+        if args and str(num) in args:
+            for fnum, finfo in trans.get_files(num)[num].iteritems():
+                print '\t', fnum, finfo['name'].split('/')[-1], \
+                    finfo['size'], finfo['completed'], finfo['selected']
 
 def start_torrent(trans, args):
     """Start torrent. Parameters is a list of torrents numbers."""
