@@ -19,9 +19,13 @@ class Test(TestCase):
             item.eta = 20 * i
             item.progress = 5 * i
             items[i] = item
- 
-        self.mod.Transmission = Mock()
-        self.mod.Transmission.return_value.list.return_value = items
+
+        trans = MagicMock()
+        trans.return_value.get_files.return_value.__getitem__.return_value = \
+                {1: {'name': 'file1', 'size': 10, 'completed': 99, 'selected': True},
+                 2: {'name': 'file2', 'size': 20, 'completed': 50, 'selected': False}}
+        trans.return_value.list.return_value = items
+        self.mod.Transmission = trans
 
         self.mod.netrc = Mock()
         self.mod.netrc.return_value.authenticators.\
@@ -49,6 +53,12 @@ class Test(TestCase):
 5 Torrent 5 seed pending 25 100
 6 Torrent 6 seeding 30 120
 """
+        with patch('sys.stdout', new_callable=StringIO) as stdout:
+            self.main(['ls', '1'])
+            assert stdout.getvalue() == """1 Torrent 1 check pending 5 20
+\t1 file1 10 99 True
+\t2 file2 20 50 False
+"""
 
     def test_start(self):
         self.main(['start', '1'])
@@ -63,10 +73,10 @@ class Test(TestCase):
     def test_down(self):
         self.main(['down', '10'])
         self.main(['down'])
-    
+
     def test_rm(self):
         self.main(['rm', '1'])
-    
+
     def test_add(self):
         assert self.main(['add', 'url']) == None
 
@@ -89,3 +99,4 @@ class Test(TestCase):
         assert self.main(['ls']) == 1
         self.mod.netrc.side_effect = IOError()
         assert self.main(['ls']) == 1
+
