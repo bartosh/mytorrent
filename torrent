@@ -128,7 +128,7 @@ def usage(proc):
     print __doc__
     print "\nUsage: torrent <command> [params]\n"
     for cmd, handler in proc.iteritems():
-        print "%6s - %s" % (cmd, handler.__doc__)
+        print "%6s - %s" % (cmd, handler[0].__doc__)
 
 def main(argv):
     """Script entry point."""
