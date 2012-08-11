@@ -12,6 +12,7 @@ Version: 0.0.1
 """
 
 import sys
+import os
 import urllib
 import urllib2
 import cookielib
@@ -135,7 +136,10 @@ def add_torrent(trans, args):
        commandline argument is a torrent url.
     """
     url, netrcobj, tr_login, tr_passwd = args[:4]
-    torrent = fetch_torrent(url, netrcobj)
+    if os.path.exists(url):
+        torrent = open(url)
+    else:
+        torrent = fetch_torrent(url, netrcobj)
 
     trans = Transmission(user=tr_login, password=tr_passwd)
     try:
@@ -143,6 +147,7 @@ def add_torrent(trans, args):
     except TransmissionError, excobj:
         print 'Transmission error: %s' % str(excobj)
         return 1
+    torrent.close()
 
 def usage(proc):
     """Script usage instructions."""
