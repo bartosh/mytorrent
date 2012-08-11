@@ -1,7 +1,10 @@
 #!/usr/bin/env python
 # vim: sw=4 ts=4 expandtab ai
 
+import os
 import imp
+import tempfile
+
 from StringIO import StringIO
 from unittest import TestCase
 from mock import Mock, MagicMock, patch
@@ -62,9 +65,11 @@ class Test(TestCase):
 
     def test_start(self):
         self.main(['start', '1'])
+        self.main(['start', '1', '1'])
 
     def test_stop(self):
         self.main(['stop', '1'])
+        self.main(['stop', '1', '1'])
 
     def test_up(self):
         self.main(['up', '10'])
@@ -79,12 +84,16 @@ class Test(TestCase):
 
     def test_add(self):
         assert self.main(['add', 'url']) == None
+        handle, path = tempfile.mkstemp()
+        os.close(handle)
+        assert self.main(['add', path]) == None
+        os.unlink(path)
 
     def test_transmissionerror(self):
         self.mod.Transmission.return_value.add.side_effect = TransmissionError("message")
         with patch('sys.stdout', new_callable=StringIO) as stdout:
             self.main(['add', 'url'])
-            assert stdout.getvalue() == 'Transmission error: message\n'
+            assert stdout.getvalue().strip() == 'Transmission error:'
 
     def test_usage(self):
         with patch('sys.stdout', new_callable=StringIO) as stdout:
