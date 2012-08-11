@@ -48,13 +48,34 @@ def list_torrents(trans, args):
                 print '\t', fnum, finfo['name'].split('/')[-1], \
                     finfo['size'], finfo['completed'], finfo['selected']
 
+
+
+def startstop(action, trans, args):
+    """
+    Start or stop torrent. Parameters is an action('start' or 'stop'),
+    torrent number and optional file number[s].
+    """
+
+    tnum = int(args[0])
+    if action == 'start':
+        trans.start(tnum)
+    elif len(args) == 1:
+        trans.stop(tnum)
+    files = trans.get_files(tnum)
+    if len(args) > 1:
+        fnums = args[1:]
+    else:
+        fnums = files[tnum].keys()
+    for fnum in fnums:
+        files[tnum][int(fnum)]['selected'] = action == 'start'
+
+    trans.set_files(files)
+
 def start_torrent(trans, args):
-    """Start torrent. Parameters is a list of torrents numbers."""
-    trans.start(args)
+    startstop('start', trans, args)
 
 def stop_torrent(trans, args):
-    """Stop torrent. Parameters is a list of torrents numbers."""
-    trans.stop(args)
+    startstop('stop', trans, args)
 
 def up_speed(trans, args=None):
     """Set upload speed limit. If no parameters provided
